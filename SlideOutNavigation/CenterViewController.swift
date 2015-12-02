@@ -30,6 +30,17 @@ class CenterViewController: UIViewController {
   }
   
   @IBAction func puppiesTapped(sender: AnyObject) {
+    delegate?.toggleRightPanel?()
   }
   
+}
+
+extension CenterViewController: SidePanelViewControllerDelegate {
+    func animalSelected(animal: Animal) {
+        imageView.image = animal.image
+        titleLabel.text = animal.title
+        creatorLabel.text = animal.creator
+        
+        delegate?.collapseSidePanels?()
+    }
 }

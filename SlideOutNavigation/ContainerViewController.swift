@@ -19,10 +19,15 @@ class ContainerViewController: UIViewController {
   
     var centerNavigationController: UINavigationController!
     var centerViewController: CenterViewController!
-    var currentState: SlideOutState = .BothCollapsed
+    var currentState: SlideOutState = .BothCollapsed {
+        didSet {
+            let shouldShowShadow = currentState != .BothCollapsed
+            showShadowForCenterViewController(shouldShowShadow)
+        }
+    }
     var leftViewController: SidePanelViewController?
-    let centerPanelExpandedOffset: CGFloat = 260
-//    var rightViewController: SidePanelViewController?
+    let centerPanelExpandedOffset: CGFloat = 160
+    var rightViewController: SidePanelViewController?
     
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -37,8 +42,41 @@ class ContainerViewController: UIViewController {
     
     centerNavigationController.didMoveToParentViewController(self)
     
+    let panGestureRecognizer = UIPanGestureRecognizer(target: self, action: "handlePanGesture:")
+    centerNavigationController.view.addGestureRecognizer(panGestureRecognizer)
+    
   }
   
+}
+
+extension ContainerViewController: UIGestureRecognizerDelegate {
+    func handlePanGesture(recognizer: UIPanGestureRecognizer) {
+        let gestureLeftToRight = (recognizer.velocityInView(view).x > 0)
+        
+        switch recognizer.state {
+        case .Began:
+            if gestureLeftToRight {
+                addLeftPanelViewController()
+            } else {
+                addRightPanelViewController()
+            }
+            
+            showShadowForCenterViewController(true)
+        case .Changed:
+            recognizer.view!.center.x += recognizer.translationInView(view).x
+        case .Ended:
+            if (leftViewController != nil) {
+                // animate the side panel open or closed based on whether the view has moved more or less than halfway
+                let hasMovedGreaterThanHalfway = recognizer.view!.center.x > view.bounds.size.width
+                animateLeftPanel(shouldExpand: hasMovedGreaterThanHalfway)
+            } else if (rightViewController != nil) {
+                let hasMovedGreaterThanHalfway = recognizer.view!.center.x < 0
+                animateRightPanel(shouldExpand: hasMovedGreaterThanHalfway)
+            }
+        default:
+            break
+        }
+    }
 }
 
 private extension UIStoryboard {
@@ -70,7 +108,13 @@ extension ContainerViewController: CenterViewControllerDelegate {
     }
     
     func toggleRightPanel() {
+        let notExpanded = (currentState != .RightPanelExpanded)
         
+        if notExpanded {
+            addRightPanelViewController()
+        }
+        
+        animateRightPanel(shouldExpand: notExpanded)
     }
     
     func addLeftPanelViewController() {
@@ -90,7 +134,12 @@ extension ContainerViewController: CenterViewControllerDelegate {
     }
     
     func addRightPanelViewController() {
-        
+        if rightViewController == nil {
+            rightViewController = UIStoryboard.rightViewController()
+            rightViewController!.animals = Animal.allDogs()
+            
+            addChildSidePanelController(rightViewController!)
+        }
     }
     
     override func addChildViewController(childController: UIViewController) {
@@ -119,7 +168,27 @@ extension ContainerViewController: CenterViewControllerDelegate {
     }
     
     func animateRightPanel(shouldExpand shouldExpand: Bool) {
-        
+        if (shouldExpand) {
+            currentState = .RightPanelExpanded
+            
+            animateCenterPanelXPosition(targetPosition: -CGRectGetWidth(centerNavigationController.view.frame) + centerPanelExpandedOffset)
+        } else {
+            animateCenterPanelXPosition(targetPosition: 0) { _ in
+                self.currentState = .BothCollapsed
+                
+                self.rightViewController!.view.removeFromSuperview()
+                self.rightViewController = nil;
+            }
+        }
+    }
+    
+    func showShadowForCenterViewController(shouldShowShadow: Bool) {
+        if(shouldShowShadow) {
+            centerNavigationController.view.layer.shadowOpacity = 0.8
+            
+        } else {
+            centerNavigationController.view.layer.shadowOpacity = 0.0
+        }
     }
     
 }
